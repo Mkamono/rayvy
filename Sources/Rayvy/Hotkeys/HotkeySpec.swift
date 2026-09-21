@@ -13,30 +13,37 @@ enum HotkeySpec {
         "ctrl": .control
     ]
 
-    private static let keysByToken: [String: KeyboardShortcuts.Key] = [
-        "a": .a, "b": .b, "c": .c, "d": .d, "e": .e, "f": .f, "g": .g, "h": .h,
-        "i": .i, "j": .j, "k": .k, "l": .l, "m": .m, "n": .n, "o": .o, "p": .p,
-        "q": .q, "r": .r, "s": .s, "t": .t, "u": .u, "v": .v, "w": .w, "x": .x,
-        "y": .y, "z": .z,
-        "0": .zero, "1": .one, "2": .two, "3": .three, "4": .four,
-        "5": .five, "6": .six, "7": .seven, "8": .eight, "9": .nine,
-        "space": .space,
-        "return": .return, "enter": .return,
-        "tab": .tab,
-        "escape": .escape, "esc": .escape,
-        "delete": .delete, "backspace": .delete,
-        "up": .upArrow, "uparrow": .upArrow,
-        "down": .downArrow, "downarrow": .downArrow,
-        "left": .leftArrow, "leftarrow": .leftArrow,
-        "right": .rightArrow, "rightarrow": .rightArrow
+    // Single source of truth for both parsing and describing keys. An `Array`, not a `Dictionary`
+    // literal, because several tokens intentionally alias the same Key (e.g. "up"/"uparrow"), and
+    // the canonical token used by `describe(_:)` must be deterministic (the first one listed here)
+    // rather than depending on Swift's per-process `Dictionary` iteration order.
+    private static let keyAliases: [(token: String, key: KeyboardShortcuts.Key)] = [
+        ("a", .a), ("b", .b), ("c", .c), ("d", .d), ("e", .e), ("f", .f), ("g", .g), ("h", .h),
+        ("i", .i), ("j", .j), ("k", .k), ("l", .l), ("m", .m), ("n", .n), ("o", .o), ("p", .p),
+        ("q", .q), ("r", .r), ("s", .s), ("t", .t), ("u", .u), ("v", .v), ("w", .w), ("x", .x),
+        ("y", .y), ("z", .z),
+        ("0", .zero), ("1", .one), ("2", .two), ("3", .three), ("4", .four),
+        ("5", .five), ("6", .six), ("7", .seven), ("8", .eight), ("9", .nine),
+        ("space", .space),
+        ("return", .return), ("enter", .return),
+        ("tab", .tab),
+        ("escape", .escape), ("esc", .escape),
+        ("delete", .delete), ("backspace", .delete),
+        ("up", .upArrow), ("uparrow", .upArrow),
+        ("down", .downArrow), ("downarrow", .downArrow),
+        ("left", .leftArrow), ("leftarrow", .leftArrow),
+        ("right", .rightArrow), ("rightarrow", .rightArrow)
     ]
 
-    // Several tokens alias the same Key (e.g. "up" and "uparrow" both map to `.upArrow`), so this
-    // can't use `Dictionary(uniqueKeysWithValues:)`; `reduce(into:)` keeps the first token seen.
+    // Tokens are unique, so this is safe with `uniqueKeysWithValues`.
+    private static let keysByToken: [String: KeyboardShortcuts.Key] =
+        Dictionary(uniqueKeysWithValues: keyAliases.map { ($0.token, $0.key) })
+
+    // Keys are not unique (aliases), so this keeps the first token listed above for each Key.
     private static let tokensByKey: [KeyboardShortcuts.Key: String] =
-        keysByToken.reduce(into: [:]) { result, entry in
-            if result[entry.value] == nil {
-                result[entry.value] = entry.key
+        keyAliases.reduce(into: [:]) { result, alias in
+            if result[alias.key] == nil {
+                result[alias.key] = alias.token
             }
         }
 
