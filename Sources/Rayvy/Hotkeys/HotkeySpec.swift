@@ -31,8 +31,14 @@ enum HotkeySpec {
         "right": .rightArrow, "rightarrow": .rightArrow
     ]
 
+    // Several tokens alias the same Key (e.g. "up" and "uparrow" both map to `.upArrow`), so this
+    // can't use `Dictionary(uniqueKeysWithValues:)`; `reduce(into:)` keeps the first token seen.
     private static let tokensByKey: [KeyboardShortcuts.Key: String] =
-        Dictionary(uniqueKeysWithValues: keysByToken.map { ($0.value, $0.key) })
+        keysByToken.reduce(into: [:]) { result, entry in
+            if result[entry.value] == nil {
+                result[entry.value] = entry.key
+            }
+        }
 
     private static let tokensByModifier: [(NSEvent.ModifierFlags, String)] = [
         (.command, "cmd"),
