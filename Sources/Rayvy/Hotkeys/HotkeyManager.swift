@@ -1,20 +1,34 @@
 import Foundation
 import KeyboardShortcuts
 
-/// Registers the Command Palette hotkey and the per-app Direct Hotkeys from `Config`, and
-/// re-registers everything when the config is hot-reloaded.
+/// Registers the Command Palette hotkey, the Clipboard History hotkey, and the per-app Direct
+/// Hotkeys from `Config`, and re-registers everything when the config is hot-reloaded.
 ///
-/// `KeyboardShortcuts.Name`s are created once per logical hotkey (palette, or a given bundle ID)
-/// and cached; reloading only calls `setShortcut`, so `onKeyDown` handlers are never registered
-/// twice for the same key (which would otherwise double-fire an action). A bundle ID removed from
-/// the config gets its shortcut cleared so it stops responding.
+/// `KeyboardShortcuts.Name`s are created once per logical hotkey (palette, clipboard history, or
+/// a given bundle ID) and cached; reloading only calls `setShortcut`, so `onKeyDown` handlers are
+/// never registered twice for the same key (which would otherwise double-fire an action). A
+/// bundle ID removed from the config gets its shortcut cleared so it stops responding.
 @MainActor
 final class HotkeyManager {
     private var paletteName: KeyboardShortcuts.Name?
+    private var clipboardHistoryName: KeyboardShortcuts.Name?
     private var directHotkeyNames: [String: KeyboardShortcuts.Name] = [:] // bundle ID -> Name
 
-    func register(config: Config, onTogglePalette: @escaping () -> Void) {
-        registerPaletteHotkey(config.launcher.hotkey, action: onTogglePalette)
+    func register(config: Config, onTogglePalette: @escaping () -> Void, onToggleClipboardHistory: @escaping () -> Void) {
+        registerSingleHotkey(
+            config.launcher.hotkey,
+            name: &paletteName,
+            identifier: "rayvy.palette",
+            logContext: "launcher.hotkey",
+            action: onTogglePalette
+        )
+        registerSingleHotkey(
+            config.clipboard.hotkey,
+            name: &clipboardHistoryName,
+            identifier: "rayvy.clipboardHistory",
+            logContext: "clipboard.hotkey",
+            action: onToggleClipboardHistory
+        )
         registerDirectHotkeys(config.hotkeys)
     }
 
@@ -22,26 +36,35 @@ final class HotkeyManager {
         if let paletteName {
             KeyboardShortcuts.setShortcut(nil, for: paletteName)
         }
+        if let clipboardHistoryName {
+            KeyboardShortcuts.setShortcut(nil, for: clipboardHistoryName)
+        }
         for name in directHotkeyNames.values {
             KeyboardShortcuts.setShortcut(nil, for: name)
         }
     }
 
-    private func registerPaletteHotkey(_ spec: String, action: @escaping () -> Void) {
+    private func registerSingleHotkey(
+        _ spec: String,
+        name: inout KeyboardShortcuts.Name?,
+        identifier: String,
+        logContext: String,
+        action: @escaping () -> Void
+    ) {
         guard let shortcut = HotkeySpec.parse(spec) else {
-            logInvalid(spec: spec, context: "launcher.hotkey")
+            logInvalid(spec: spec, context: logContext)
             return
         }
 
-        let name: KeyboardShortcuts.Name
-        if let existing = paletteName {
-            name = existing
+        let resolvedName: KeyboardShortcuts.Name
+        if let existing = name {
+            resolvedName = existing
         } else {
-            name = KeyboardShortcuts.Name("rayvy.palette")
-            paletteName = name
-            KeyboardShortcuts.onKeyDown(for: name, action: action)
+            resolvedName = KeyboardShortcuts.Name(identifier)
+            name = resolvedName
+            KeyboardShortcuts.onKeyDown(for: resolvedName, action: action)
         }
-        KeyboardShortcuts.setShortcut(shortcut, for: name)
+        KeyboardShortcuts.setShortcut(shortcut, for: resolvedName)
     }
 
     private func registerDirectHotkeys(_ entries: [HotkeyEntry]) {

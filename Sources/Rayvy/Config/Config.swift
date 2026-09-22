@@ -19,11 +19,13 @@ struct ClipboardConfig: Equatable, Decodable {
     var enabled: Bool = true
     var maxItems: Int = 100
     var excludedBundleIDs: [String] = []
+    var hotkey: String = "cmd+shift+v"
 
     enum CodingKeys: String, CodingKey {
         case enabled
         case maxItems = "max_items"
         case excludedBundleIDs = "excluded_bundle_ids"
+        case hotkey
     }
 
     init() {}
@@ -34,6 +36,7 @@ struct ClipboardConfig: Equatable, Decodable {
         self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? defaults.enabled
         self.maxItems = try container.decodeIfPresent(Int.self, forKey: .maxItems) ?? defaults.maxItems
         self.excludedBundleIDs = try container.decodeIfPresent([String].self, forKey: .excludedBundleIDs) ?? defaults.excludedBundleIDs
+        self.hotkey = try container.decodeIfPresent(String.self, forKey: .hotkey) ?? defaults.hotkey
     }
 }
 
@@ -79,6 +82,7 @@ enum ConfigDefaults {
     enabled = true
     max_items = 100
     excluded_bundle_ids = []
+    hotkey = "cmd+shift+v"
 
     [[hotkeys]]
     key = "option+t"

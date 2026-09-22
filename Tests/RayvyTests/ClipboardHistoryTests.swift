@@ -44,4 +44,13 @@ final class ClipboardHistoryTests: XCTestCase {
         history.add(text: "")
         XCTAssertTrue(history.items.isEmpty)
     }
+
+    func testRemoveDeletesOnlyTheGivenItem() {
+        let history = makeHistory(maxItems: 10)
+        history.add(text: "keep")
+        history.add(text: "delete-me")
+        let toRemove = history.items.first { $0.text == "delete-me" }!
+        history.remove(toRemove)
+        XCTAssertEqual(history.items.map(\.text), ["keep"])
+    }
 }

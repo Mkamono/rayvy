@@ -12,6 +12,7 @@ final class ConfigTests: XCTestCase {
         enabled = true
         max_items = 50
         excluded_bundle_ids = ["com.apple.SecurityAgent"]
+        hotkey = "cmd+shift+c"
 
         [[hotkeys]]
         key = "option+t"
@@ -28,6 +29,7 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.clipboard.enabled, true)
         XCTAssertEqual(config.clipboard.maxItems, 50)
         XCTAssertEqual(config.clipboard.excludedBundleIDs, ["com.apple.SecurityAgent"])
+        XCTAssertEqual(config.clipboard.hotkey, "cmd+shift+c")
         XCTAssertEqual(config.hotkeys.count, 2)
         XCTAssertEqual(config.hotkeys[0], HotkeyEntry(key: "option+t", bundleID: "com.mitchellh.ghostty"))
         XCTAssertEqual(config.hotkeys[1], HotkeyEntry(key: "option+b", bundleID: "com.apple.Safari"))
@@ -54,6 +56,7 @@ final class ConfigTests: XCTestCase {
     func testDefaultTemplateParsesSuccessfully() throws {
         let config = try TOMLDecoder().decode(Config.self, from: ConfigDefaults.template)
         XCTAssertEqual(config.launcher.hotkey, "option+space")
+        XCTAssertEqual(config.clipboard.hotkey, "cmd+shift+v")
         XCTAssertEqual(config.hotkeys.count, 2)
     }
 }

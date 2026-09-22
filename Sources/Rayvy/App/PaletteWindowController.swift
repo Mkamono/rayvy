@@ -14,11 +14,6 @@ private final class KeyablePanel: NSPanel {
 @MainActor
 final class PaletteWindowController {
     private static let panelWidth: CGFloat = 640
-    private static let textFieldAreaHeight: CGFloat = 56
-    private static let sectionHeaderHeight: CGFloat = 26
-    private static let rowHeight: CGFloat = 32
-    private static let dividerAndBottomPadding: CGFloat = 9
-    private static let maxListHeight: CGFloat = 400
 
     private let panel: NSPanel
     private let viewModel: PaletteViewModel
@@ -43,7 +38,7 @@ final class PaletteWindowController {
         self.viewModel = viewModel
 
         let panel = KeyablePanel(
-            contentRect: NSRect(x: 0, y: 0, width: Self.panelWidth, height: Self.textFieldAreaHeight),
+            contentRect: NSRect(x: 0, y: 0, width: Self.panelWidth, height: PaletteViewModel.textFieldAreaHeight),
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -62,9 +57,9 @@ final class PaletteWindowController {
             self?.hide()
         }
 
-        viewModel.$sections
-            .sink { [weak self] sections in
-                self?.resize(for: sections)
+        viewModel.$contentHeight
+            .sink { [weak self] height in
+                self?.resize(to: height)
             }
             .store(in: &cancellables)
     }
@@ -77,16 +72,33 @@ final class PaletteWindowController {
         }
     }
 
+    /// Toggles the palette scoped straight to Clipboard History (the Clipboard History hotkey).
+    func toggleClipboardHistory() {
+        if panel.isVisible {
+            hide()
+        } else {
+            showClipboardHistory()
+        }
+    }
+
     func show() {
+        present(scopedToClipboard: false)
+    }
+
+    func showClipboardHistory() {
+        present(scopedToClipboard: true)
+    }
+
+    private func present(scopedToClipboard: Bool) {
         previouslyActiveApp = NSWorkspace.shared.frontmostApplication
 
         if let screenFrame = NSScreen.main?.visibleFrame {
             anchorX = screenFrame.midX - Self.panelWidth / 2
-            anchorTopY = screenFrame.midY + screenFrame.height * 0.15 + Self.textFieldAreaHeight / 2
+            anchorTopY = screenFrame.midY + screenFrame.height * 0.15 + PaletteViewModel.textFieldAreaHeight / 2
         }
 
-        // Triggers `viewModel.$sections`, which resizes the panel to fit before it's shown.
-        viewModel.reset()
+        // Triggers `viewModel.$contentHeight`, which resizes the panel to fit before it's shown.
+        viewModel.reset(scopedToClipboard: scopedToClipboard)
 
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
@@ -100,21 +112,14 @@ final class PaletteWindowController {
         previouslyActiveApp = nil
     }
 
-    private func resize(for sections: [(PaletteSection, [PaletteItem])]) {
+    private func resize(to height: CGFloat) {
         guard let anchorX, let anchorTopY else { return }
-
-        let rawListHeight = sections.reduce(CGFloat(0)) { partial, section in
-            partial + Self.sectionHeaderHeight + CGFloat(section.1.count) * Self.rowHeight
-        }
-        let listHeight = sections.isEmpty ? 0 : min(Self.maxListHeight, rawListHeight)
-        let extra: CGFloat = sections.isEmpty ? 0 : Self.dividerAndBottomPadding
-        let totalHeight = Self.textFieldAreaHeight + listHeight + extra
 
         let newFrame = NSRect(
             x: anchorX,
-            y: anchorTopY - totalHeight,
+            y: anchorTopY - height,
             width: Self.panelWidth,
-            height: totalHeight
+            height: height
         )
         panel.setFrame(newFrame, display: panel.isVisible)
     }
@@ -123,18 +128,40 @@ final class PaletteWindowController {
         removeKeyEventMonitor()
         keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+
+            if event.keyCode == 40, event.modifierFlags.contains(.command) { // ⌘K
+                self.viewModel.toggleActionMenu()
+                return nil
+            }
+
             switch event.keyCode {
             case 53: // Escape
-                self.hide()
+                if self.viewModel.isActionMenuOpen {
+                    self.viewModel.closeActionMenu()
+                } else {
+                    self.hide()
+                }
                 return nil
             case 125: // Down arrow
-                self.viewModel.moveSelection(by: 1)
+                if self.viewModel.isActionMenuOpen {
+                    self.viewModel.moveActionSelection(by: 1)
+                } else {
+                    self.viewModel.moveSelection(by: 1)
+                }
                 return nil
             case 126: // Up arrow
-                self.viewModel.moveSelection(by: -1)
+                if self.viewModel.isActionMenuOpen {
+                    self.viewModel.moveActionSelection(by: -1)
+                } else {
+                    self.viewModel.moveSelection(by: -1)
+                }
                 return nil
             case 36: // Return
-                self.viewModel.activateSelected()
+                if self.viewModel.isActionMenuOpen {
+                    self.viewModel.activateActionMenuSelection()
+                } else {
+                    self.viewModel.activateSelected()
+                }
                 return nil
             default:
                 return event

@@ -30,9 +30,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = paletteWindowController
 
         clipboardMonitor.start()
-        hotkeyManager.register(config: config) { [weak self] in
-            self?.paletteWindowController.toggle()
-        }
+        hotkeyManager.register(
+            config: config,
+            onTogglePalette: { [weak self] in self?.paletteWindowController.toggle() },
+            onToggleClipboardHistory: { [weak self] in self?.paletteWindowController.toggleClipboardHistory() }
+        )
 
         let watcher = ConfigWatcher { [weak self] newConfig in
             self?.applyConfig(newConfig)
@@ -56,8 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         appIndex.refresh()
 
-        hotkeyManager.register(config: newConfig) { [weak self] in
-            self?.paletteWindowController.toggle()
-        }
+        hotkeyManager.register(
+            config: newConfig,
+            onTogglePalette: { [weak self] in self?.paletteWindowController.toggle() },
+            onToggleClipboardHistory: { [weak self] in self?.paletteWindowController.toggleClipboardHistory() }
+        )
     }
 }

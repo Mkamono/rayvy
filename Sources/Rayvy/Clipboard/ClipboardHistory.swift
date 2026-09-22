@@ -41,6 +41,11 @@ final class ClipboardHistory {
         pasteboard.setString(item.text, forType: .string)
     }
 
+    func remove(_ item: ClipboardItem) {
+        items.removeAll { $0.id == item.id }
+        save()
+    }
+
     private func trim() {
         if items.count > maxItems {
             items.removeLast(items.count - maxItems)
