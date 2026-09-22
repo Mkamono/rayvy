@@ -53,6 +53,11 @@ final class HotkeyManager {
     ) {
         guard let shortcut = HotkeySpec.parse(spec) else {
             logInvalid(spec: spec, context: logContext)
+            // Config is the source of truth: an edit that makes the spec invalid should clear
+            // whatever was bound before, not leave the last-valid shortcut silently active.
+            if let existing = name {
+                KeyboardShortcuts.setShortcut(nil, for: existing)
+            }
             return
         }
 
@@ -75,6 +80,11 @@ final class HotkeyManager {
 
             guard let shortcut = HotkeySpec.parse(entry.key) else {
                 logInvalid(spec: entry.key, context: entry.bundleID)
+                // The bundle ID stays in `configuredBundleIDs`, so the cleanup loop below won't
+                // catch this one — clear it here instead of leaving the last-valid key active.
+                if let existing = directHotkeyNames[entry.bundleID] {
+                    KeyboardShortcuts.setShortcut(nil, for: existing)
+                }
                 continue
             }
 
