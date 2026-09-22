@@ -6,6 +6,10 @@ final class PaletteViewModel: ObservableObject {
     @Published var query: String = ""
     @Published private(set) var sections: [(PaletteSection, [PaletteItem])] = []
     @Published var selectedID: String?
+    /// Bumped on every `reset()` so the view can re-focus the search field each time the palette
+    /// is shown. Needed because the hosting view (and its SwiftUI hierarchy) is created once and
+    /// reused across show/hide cycles, so `.onAppear` only fires the first time.
+    @Published private(set) var focusToken = UUID()
 
     private let appIndex: AppIndex
     private let clipboardHistory: ClipboardHistory
@@ -22,6 +26,7 @@ final class PaletteViewModel: ObservableObject {
     /// (running apps and clipboard history change between openings).
     func reset() {
         query = ""
+        focusToken = UUID()
         recomputeItems()
     }
 
@@ -100,6 +105,9 @@ struct PaletteView: View {
                 .focused($searchFieldIsFocused)
                 .onChange(of: viewModel.query) { _ in
                     viewModel.recomputeItems()
+                }
+                .onChange(of: viewModel.focusToken) { _ in
+                    searchFieldIsFocused = true
                 }
 
             Divider()

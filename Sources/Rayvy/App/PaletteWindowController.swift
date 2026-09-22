@@ -1,6 +1,12 @@
 import AppKit
 import SwiftUI
 
+/// A borderless `NSPanel` normally can't become the key window (Apple's default is `false` unless
+/// the panel is titled), which would leave the search field unable to receive keyboard focus.
+private final class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}
+
 /// Owns the borderless floating panel that hosts the Command Palette, and the show/hide
 /// choreography: activate Rayvy + focus the search field on show, restore the previously
 /// frontmost app on hide (Spotlight-style).
@@ -21,7 +27,7 @@ final class PaletteWindowController {
         )
         self.viewModel = viewModel
 
-        let panel = NSPanel(
+        let panel = KeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 80),
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
