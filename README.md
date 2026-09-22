@@ -1,5 +1,7 @@
 # Rayvy
 
+<img src="Resources/AppIcon-1024.png" width="128" alt="Rayvy icon" />
+
 macOS向けの軽量ランチャー。`⌥Space` → Command Palette → アプリ / Clipboard History / システム操作。
 
 ## 概要
