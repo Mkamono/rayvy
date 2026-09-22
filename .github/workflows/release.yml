@@ -60,6 +60,11 @@ jobs:
           sha256 = "$sha256"
           artifact = "Rayvy.app"
           os = "macos/arm64"
+
+          # Optional: launch Rayvy automatically at login.
+          [bootstrap.macos.launchd.agents.rayvy]
+          program = "/Applications/Rayvy.app/Contents/MacOS/Rayvy"
+          run_at_load = true
           EOF
 
           git config user.name "github-actions[bot]"

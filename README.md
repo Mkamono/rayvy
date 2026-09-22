@@ -30,6 +30,9 @@ mise bootstrap
 Rayvy.appはad-hoc署名(notarizeなし)のため、初回起動時にGatekeeperにブロックされる。
 [トラブルシューティング](#トラブルシューティング)を参照。
 
+Rayvy自身にはログイン時自動起動の仕組みは無い。必要なら `mise.example.toml` の
+`[bootstrap.macos.launchd.agents.rayvy]` を有効にすると、mise側でLaunchAgentとして登録できる。
+
 ## 使い方
 
 ランチャーのホットキー(デフォルト `⌥Space`)でCommand Paletteを開く。アプリ・System Commands・Clipboard

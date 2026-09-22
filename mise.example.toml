@@ -4,3 +4,8 @@ url = "https://github.com/Mkamono/rayvy/releases/download/v{{version}}/Rayvy-{{v
 sha256 = "22dfa5fd48410392299c33bf87b91312097310578319161f2a89c231da941eb7"
 artifact = "Rayvy.app"
 os = "macos/arm64"
+
+# Optional: launch Rayvy automatically at login.
+[bootstrap.macos.launchd.agents.rayvy]
+program = "/Applications/Rayvy.app/Contents/MacOS/Rayvy"
+run_at_load = true

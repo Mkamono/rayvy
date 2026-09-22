@@ -191,8 +191,9 @@ mise側で、
 * バージョン固定
 * 更新
 * 新しいMacへの環境復元
+* ログイン時自動起動(任意、`bootstrap.macos.launchd.agents`)
 
-を管理する。
+を管理する。Rayvy自身はLaunchAgent/SMAppServiceの類を持たない。
 
 Rayvy自身には独自Updaterを持たせない。
 
