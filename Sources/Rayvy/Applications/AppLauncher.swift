@@ -14,6 +14,21 @@ enum AppLauncher {
         launch(at: url)
     }
 
+    /// Direct Hotkey behavior: if the app isn't running, launch it. If it's running but not
+    /// frontmost, bring it to the front. If it's already frontmost, hide it (⌘H-equivalent) so a
+    /// second press of the same hotkey acts as a toggle.
+    static func toggle(bundleID: String) {
+        guard let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID }) else {
+            launch(bundleID: bundleID)
+            return
+        }
+        if running.isActive {
+            running.hide()
+        } else {
+            running.activate()
+        }
+    }
+
     private static func launch(at url: URL) {
         let configuration = NSWorkspace.OpenConfiguration()
         NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, error in

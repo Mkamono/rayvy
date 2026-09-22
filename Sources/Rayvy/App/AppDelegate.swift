@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = clipboardMonitor
         _ = paletteWindowController
 
+        paletteWindowController.updateConfig(config)
         clipboardMonitor.start()
         hotkeyManager.register(
             config: config,
@@ -57,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clipboardMonitor.excludedBundleIDs = Set(newConfig.clipboard.excludedBundleIDs)
 
         appIndex.refresh()
+        paletteWindowController.updateConfig(newConfig)
 
         hotkeyManager.register(
             config: newConfig,

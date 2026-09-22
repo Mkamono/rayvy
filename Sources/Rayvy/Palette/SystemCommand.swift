@@ -39,6 +39,14 @@ enum SystemCommand {
                 action: SystemActions.quitAll
             ),
             PaletteItem(
+                id: "system.openSettings",
+                section: .commands,
+                title: "Open Rayvy Settings",
+                subtitle: ConfigLoader.configFileURL.path,
+                icon: NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil),
+                action: { NSWorkspace.shared.open(ConfigLoader.configFileURL) }
+            ),
+            PaletteItem(
                 id: "system.quitRayvy",
                 section: .commands,
                 title: "Quit Rayvy",

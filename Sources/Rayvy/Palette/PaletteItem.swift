@@ -2,15 +2,16 @@ import AppKit
 import Foundation
 
 enum PaletteSection: String, CaseIterable {
+    case alerts = "Alerts"
     case applications = "Applications"
     case commands = "Commands"
     case clipboard = "Clipboard History"
 }
 
 /// A secondary action reachable via ⌘K on a selected item (Raycast-style), for things that don't
-/// belong on the primary Enter action. Deliberately excludes anything that would rewrite
-/// `config.toml` (e.g. assigning a hotkey) — SPEC keeps the TOML file as the sole source of truth
-/// and rules out a GUI settings surface.
+/// belong on the primary Enter action. The one action that writes back to `config.toml` is
+/// Applications' "Assign Hotkey…" — see CLAUDE.md's "Config as source of truth" before adding
+/// another one.
 struct PaletteAction: Identifiable {
     let id: String
     let title: String

@@ -9,8 +9,8 @@ private final class KeyablePanel: NSPanel {
 }
 
 /// Owns the borderless floating panel that hosts the Command Palette, and the show/hide
-/// choreography: activate Rayvy + focus the search field on show, restore the previously
-/// frontmost app on hide (Spotlight-style).
+/// choreography: activate Rayvy + focus the search field and switch to Roman input on show,
+/// restore the previously frontmost app and input source on hide (Spotlight-style).
 @MainActor
 final class PaletteWindowController {
     private static let panelWidth: CGFloat = 640
@@ -18,6 +18,7 @@ final class PaletteWindowController {
     private let panel: NSPanel
     private let viewModel: PaletteViewModel
     private var previouslyActiveApp: NSRunningApplication?
+    private var previousInputSourceID: String?
     private var keyEventMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
 
@@ -64,6 +65,12 @@ final class PaletteWindowController {
             .store(in: &cancellables)
     }
 
+    /// Forwards `Config.hotkeys` to the view model so "Assign Hotkey…" can show the current
+    /// binding. Called on initial load and every hot-reload — see `AppDelegate`.
+    func updateConfig(_ config: Config) {
+        viewModel.updateDirectHotkeys(config.hotkeys)
+    }
+
     func toggle() {
         if panel.isVisible {
             hide()
@@ -91,6 +98,7 @@ final class PaletteWindowController {
 
     private func present(scopedToClipboard: Bool) {
         previouslyActiveApp = NSWorkspace.shared.frontmostApplication
+        previousInputSourceID = InputSourceSwitcher.switchToAlphabetInput()
 
         if let screenFrame = NSScreen.main?.visibleFrame {
             anchorX = screenFrame.midX - Self.panelWidth / 2
@@ -110,6 +118,8 @@ final class PaletteWindowController {
         panel.orderOut(nil)
         previouslyActiveApp?.activate()
         previouslyActiveApp = nil
+        InputSourceSwitcher.restore(to: previousInputSourceID)
+        previousInputSourceID = nil
     }
 
     private func resize(to height: CGFloat) {
@@ -128,6 +138,15 @@ final class PaletteWindowController {
         removeKeyEventMonitor()
         keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+
+            if self.viewModel.hotkeyCapture != nil {
+                if event.keyCode == 53 { // Escape
+                    self.viewModel.cancelHotkeyCapture()
+                } else {
+                    self.viewModel.handleHotkeyCapture(event: event)
+                }
+                return nil
+            }
 
             if event.keyCode == 40, event.modifierFlags.contains(.command) { // ⌘K
                 self.viewModel.toggleActionMenu()

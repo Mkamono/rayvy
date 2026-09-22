@@ -86,7 +86,7 @@ final class HotkeyManager {
                 let newName = KeyboardShortcuts.Name("rayvy.hotkey.\(bundleID)")
                 directHotkeyNames[bundleID] = newName
                 KeyboardShortcuts.onKeyDown(for: newName) {
-                    AppLauncher.launch(bundleID: bundleID)
+                    AppLauncher.toggle(bundleID: bundleID)
                 }
                 name = newName
             }

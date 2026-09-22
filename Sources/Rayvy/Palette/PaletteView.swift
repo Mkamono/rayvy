@@ -1,16 +1,28 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 
 @MainActor
 final class PaletteViewModel: ObservableObject {
     // Single source of truth for panel layout, shared with PaletteWindowController via
     // `contentHeight` so the window always exactly fits what's currently on screen (the results
-    // list, or the ⌘K action menu when one is open).
+    // list, the ⌘K action menu, or the hotkey capture screen when one is open).
     static let rowHeight: CGFloat = 32
     static let sectionHeaderHeight: CGFloat = 26
     static let textFieldAreaHeight: CGFloat = 56
     static let dividerAndBottomPadding: CGFloat = 9
     static let maxListHeight: CGFloat = 400
+    static let hotkeyCaptureLineCount = 3
+
+    /// State for the "Assign Hotkey…" screen (opened from an app's ⌘K action menu). Holds the
+    /// bundle ID being assigned, its current key spec (if any) for display, and a transient
+    /// validation error shown after an unusable key press.
+    struct HotkeyCaptureState {
+        let bundleID: String
+        let appName: String
+        var currentKey: String?
+        var errorMessage: String?
+    }
 
     @Published var query: String = ""
     @Published private(set) var sections: [(PaletteSection, [PaletteItem])] = []
@@ -24,11 +36,15 @@ final class PaletteViewModel: ObservableObject {
     @Published private(set) var scopedSection: PaletteSection?
     @Published private(set) var isActionMenuOpen = false
     @Published private(set) var actionMenuSelectedIndex = 0
+    @Published private(set) var hotkeyCapture: HotkeyCaptureState?
     @Published private(set) var contentHeight: CGFloat = PaletteViewModel.textFieldAreaHeight
 
     private let appIndex: AppIndex
     private let clipboardHistory: ClipboardHistory
     private let onQuitRayvy: () -> Void
+    /// bundle ID -> configured Direct Hotkey spec, kept in sync with `Config.hotkeys` by
+    /// `PaletteWindowController.updateConfig(_:)` so "Assign Hotkey…" can show the current binding.
+    private var directHotkeys: [String: String] = [:]
     var onActivate: (() -> Void)?
 
     init(appIndex: AppIndex, clipboardHistory: ClipboardHistory, onQuitRayvy: @escaping () -> Void) {
@@ -44,8 +60,15 @@ final class PaletteViewModel: ObservableObject {
         query = ""
         focusToken = UUID()
         isActionMenuOpen = false
+        hotkeyCapture = nil
         scopedSection = scopedToClipboard ? .clipboard : nil
         recomputeItems()
+    }
+
+    /// Keeps the "Assign Hotkey…" action's displayed current binding in sync with `Config`.
+    /// Called by `PaletteWindowController.updateConfig(_:)` on load and every hot-reload.
+    func updateDirectHotkeys(_ entries: [HotkeyEntry]) {
+        directHotkeys = Dictionary(entries.map { ($0.bundleID, $0.key) }, uniquingKeysWith: { _, latest in latest })
     }
 
     func recomputeItems() {
@@ -72,6 +95,10 @@ final class PaletteViewModel: ObservableObject {
                 pasteboard.clearContents()
                 pasteboard.setString(app.id, forType: .string)
             })
+            let hotkeyActionTitle = directHotkeys[app.id].map { "Change Hotkey (\($0))\u{2026}" } ?? "Assign Hotkey\u{2026}"
+            actions.append(PaletteAction(id: "assignHotkey", title: hotkeyActionTitle) { [weak self] in
+                self?.beginHotkeyCapture(bundleID: app.id, appName: app.name)
+            })
 
             return PaletteItem(
                 id: "app.\(app.id)",
@@ -91,7 +118,10 @@ final class PaletteViewModel: ObservableObject {
         let filteredCommands = PaletteSearch.filter(commandItems, query: query)
         let filteredClipboard = PaletteSearch.filter(clipboardItems, query: query)
 
+        let alertItems = PermissionAlert.makeItems()
+
         var newSections: [(PaletteSection, [PaletteItem])] = []
+        if !alertItems.isEmpty { newSections.append((.alerts, alertItems)) }
         if !filteredApps.isEmpty { newSections.append((.applications, filteredApps)) }
         if !filteredCommands.isEmpty { newSections.append((.commands, filteredCommands)) }
         if !filteredClipboard.isEmpty { newSections.append((.clipboard, filteredClipboard)) }
@@ -102,7 +132,12 @@ final class PaletteViewModel: ObservableObject {
     /// commands entirely, since only the clipboard section can ever be shown.
     private func recomputeClipboardOnlyItems() {
         let filteredClipboard = PaletteSearch.filter(makeClipboardItems(), query: query)
-        applySections(filteredClipboard.isEmpty ? [] : [(.clipboard, filteredClipboard)])
+        let alertItems = PermissionAlert.makeItems()
+
+        var newSections: [(PaletteSection, [PaletteItem])] = []
+        if !alertItems.isEmpty { newSections.append((.alerts, alertItems)) }
+        if !filteredClipboard.isEmpty { newSections.append((.clipboard, filteredClipboard)) }
+        applySections(newSections)
     }
 
     private func makeClipboardItems() -> [PaletteItem] {
@@ -119,7 +154,10 @@ final class PaletteViewModel: ObservableObject {
                         self?.recomputeItems()
                     }
                 ],
-                action: { self.clipboardHistory.recopy(item) }
+                action: { [weak self] in
+                    self?.clipboardHistory.recopy(item)
+                    PasteSimulator.pasteIntoFrontmostApp()
+                }
             )
         }
     }
@@ -185,10 +223,67 @@ final class PaletteViewModel: ObservableObject {
         let action = item.actions[actionMenuSelectedIndex]
         isActionMenuOpen = false
         action.perform()
-        onActivate?()
+        // "Assign Hotkey…" leaves the palette open in capture mode instead of dismissing it, so
+        // skip the usual close-on-action behavior when it just opened the capture screen.
+        if hotkeyCapture == nil {
+            onActivate?()
+        }
+    }
+
+    /// Opens the "Assign Hotkey…" screen in place of the results list, replacing the ⌘K action
+    /// menu. `PaletteWindowController`'s key monitor routes the next key event to
+    /// `handleHotkeyCapture(event:)` instead of normal palette navigation while this is non-nil.
+    func beginHotkeyCapture(bundleID: String, appName: String) {
+        isActionMenuOpen = false
+        hotkeyCapture = HotkeyCaptureState(bundleID: bundleID, appName: appName, currentKey: directHotkeys[bundleID], errorMessage: nil)
+        recomputeContentHeight()
+    }
+
+    func cancelHotkeyCapture() {
+        hotkeyCapture = nil
+        recomputeContentHeight()
+    }
+
+    /// Validates the pressed key combo and, if usable, writes it to `config.toml` as `bundleID`'s
+    /// Direct Hotkey. An unusable combo (no modifier, or a key `HotkeySpec` doesn't recognize)
+    /// shows an inline error and keeps capturing rather than closing the screen.
+    func handleHotkeyCapture(event: NSEvent) {
+        guard var capture = hotkeyCapture else { return }
+
+        guard let shortcut = KeyboardShortcuts.Shortcut(event: event) else { return }
+
+        guard !shortcut.modifiers.isEmpty else {
+            capture.errorMessage = "Add a modifier key (\u{2318}\u{2325}\u{2303}\u{21e7})"
+            hotkeyCapture = capture
+            return
+        }
+
+        guard let spec = HotkeySpec.describe(shortcut) else {
+            capture.errorMessage = "Unsupported key"
+            hotkeyCapture = capture
+            return
+        }
+
+        do {
+            try ConfigWriter.setDirectHotkey(key: spec, bundleID: capture.bundleID)
+            directHotkeys[capture.bundleID] = spec
+            hotkeyCapture = nil
+            recomputeItems()
+        } catch {
+            capture.errorMessage = "Failed to save config.toml"
+            hotkeyCapture = capture
+        }
     }
 
     private func recomputeContentHeight() {
+        if hotkeyCapture != nil {
+            let captureHeight = Self.sectionHeaderHeight
+                + CGFloat(Self.hotkeyCaptureLineCount) * Self.rowHeight
+                + Self.dividerAndBottomPadding
+            contentHeight = Self.textFieldAreaHeight + captureHeight
+            return
+        }
+
         if isActionMenuOpen, let item = selectedItem, !item.actions.isEmpty {
             let menuHeight = Self.sectionHeaderHeight
                 + CGFloat(item.actions.count) * Self.rowHeight
@@ -229,7 +324,9 @@ struct PaletteView: View {
 
             Divider()
 
-            if viewModel.isActionMenuOpen, let item = viewModel.selectedItem {
+            if let capture = viewModel.hotkeyCapture {
+                HotkeyCaptureView(state: capture)
+            } else if viewModel.isActionMenuOpen, let item = viewModel.selectedItem {
                 ActionMenuView(
                     item: item,
                     selectedIndex: viewModel.actionMenuSelectedIndex,
@@ -331,6 +428,35 @@ private struct ActionMenuView: View {
                 }
             }
         }
+        .padding(.bottom, 8)
+    }
+}
+
+/// The "Assign Hotkey…" screen, shown in place of the results list while `PaletteViewModel`
+/// waits for the next key event (see `PaletteWindowController`'s key monitor).
+private struct HotkeyCaptureView: View {
+    let state: PaletteViewModel.HotkeyCaptureState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Hotkey for \(state.appName)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Text(state.errorMessage ?? "Press a key combination\u{2026}")
+                .foregroundStyle(state.errorMessage == nil ? Color.primary : Color.red)
+
+            Text(state.currentKey.map { "Current: \($0)" } ?? "No hotkey assigned yet")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("Esc to cancel")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 8)
         .padding(.bottom, 8)
     }
 }

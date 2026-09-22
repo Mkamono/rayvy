@@ -1,12 +1,13 @@
 import Foundation
 
 /// Watches `~/.config/rayvy/config.toml` for changes and notifies a callback with the reloaded
-/// config. Uses a `DispatchSourceFileSystemObject` on the containing directory so it survives
-/// editors that replace the file via rename-on-save (which invalidates a descriptor opened
-/// directly on the file).
+/// config. Watches the file itself (so in-place saves, which don't touch the containing
+/// directory's entries, are seen), and on a rename/delete event — which most editors do on save,
+/// replacing the file's inode rather than writing into it — re-opens a fresh descriptor on the
+/// new file so it keeps watching after the replacement.
 final class ConfigWatcher {
     private var source: DispatchSourceFileSystemObject?
-    private var directoryFileDescriptor: CInt = -1
+    private var fileDescriptor: CInt = -1
     private var debounceWorkItem: DispatchWorkItem?
     private let onChange: (Config) -> Void
 
@@ -20,9 +21,24 @@ final class ConfigWatcher {
         let directoryURL = ConfigLoader.configDirectoryURL
         try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
 
-        let fd = open(directoryURL.path, O_EVTONLY)
+        openSource()
+    }
+
+    func stop() {
+        source?.setEventHandler {}
+        source?.cancel()
+        source = nil
+        debounceWorkItem?.cancel()
+        debounceWorkItem = nil
+    }
+
+    private func openSource() {
+        let fileURL = ConfigLoader.configFileURL
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+
+        let fd = open(fileURL.path, O_EVTONLY)
         guard fd >= 0 else { return }
-        directoryFileDescriptor = fd
+        fileDescriptor = fd
 
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
@@ -30,23 +46,32 @@ final class ConfigWatcher {
             queue: DispatchQueue.main
         )
         source.setEventHandler { [weak self] in
-            self?.scheduleReload()
+            guard let self else { return }
+            self.scheduleReload()
+            if source.data.contains(.rename) || source.data.contains(.delete) {
+                self.reopenAfterReplace()
+            }
         }
         source.setCancelHandler { [weak self] in
-            if let self, self.directoryFileDescriptor >= 0 {
-                close(self.directoryFileDescriptor)
-                self.directoryFileDescriptor = -1
+            if let self, self.fileDescriptor >= 0 {
+                close(self.fileDescriptor)
+                self.fileDescriptor = -1
             }
         }
         source.resume()
         self.source = source
     }
 
-    func stop() {
+    /// The old descriptor now points at a stale/unlinked inode (the editor replaced the file
+    /// rather than writing into it), so drop it and attach a fresh one to the file at the same
+    /// path. A short delay gives a write-temp-then-rename save time to finish before we reopen.
+    private func reopenAfterReplace() {
+        source?.setEventHandler {}
         source?.cancel()
         source = nil
-        debounceWorkItem?.cancel()
-        debounceWorkItem = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.openSource()
+        }
     }
 
     private func scheduleReload() {

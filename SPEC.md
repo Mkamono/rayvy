@@ -133,7 +133,9 @@ bundle_id = "com.apple.Safari"
 
 設定ファイルの変更は監視し、RayvyへHot Reloadする。
 
-GUI設定画面は作らない。
+汎用のGUI設定画面は作らない。唯一の例外として、Command PaletteのApp項目で⌘Kから開くアクションメニューに
+「Assign Hotkey」を用意し、キー入力を1つ受け取ってDirect Hotkey(`[[hotkeys]]`)をconfig.tomlへ書き戻せるようにする。
+それ以外の設定項目(launcher/clipboardのhotkeyや個別の設定値の編集など)はGUIから変更できるようにしない。
 
 ## ローカル状態
 
@@ -268,7 +270,7 @@ GUI・CLIで共通化したい処理が増えた場合は `RayvyCore` のSwift P
 * mise task連携
 * 高度なfuzzy search
 * Usage Ranking
-* GUI設定画面
+* 汎用のGUI設定画面(Direct HotkeyのAssign Hotkeyアクションのみ例外)
 * 独自Cloud Sync
 * 設定Migration
 * 設定Schema Versioning
