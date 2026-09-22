@@ -12,7 +12,7 @@ private final class KeyablePanel: NSPanel {
 /// choreography: activate Rayvy + focus the search field and switch to Roman input on show,
 /// restore the previously frontmost app and input source on hide (Spotlight-style).
 @MainActor
-final class PaletteWindowController {
+final class PaletteWindowController: NSObject, NSWindowDelegate {
     private static let panelWidth: CGFloat = 640
 
     private let panel: NSPanel
@@ -21,6 +21,10 @@ final class PaletteWindowController {
     private var previousInputSourceID: String?
     private var keyEventMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
+    // Guards against `hide()` re-entering itself: ordering the panel out below can synchronously
+    // trigger `windowDidResignKey`, which would otherwise call back into `hide()` mid-call and
+    // null out `previouslyActiveApp` before the outer call gets to read it.
+    private var isHiding = false
 
     // The panel's on-screen position is fixed once per `show()` and only its height changes as
     // results come and go, so it grows/shrinks downward from a stable top edge instead of
@@ -54,6 +58,10 @@ final class PaletteWindowController {
         panel.contentView = NSHostingView(rootView: PaletteView(viewModel: viewModel))
         self.panel = panel
 
+        super.init()
+
+        panel.delegate = self
+
         viewModel.onActivate = { [weak self] dismissesToPreviousApp in
             self?.hide(restorePreviousApp: dismissesToPreviousApp)
         }
@@ -63,6 +71,15 @@ final class PaletteWindowController {
                 self?.resize(to: height)
             }
             .store(in: &cancellables)
+    }
+
+    /// Clicking outside the panel (or ⌘-Tabbing away) makes another window key, which resigns key
+    /// status from `panel` — treat that the same as an explicit dismiss. Doesn't restore the
+    /// previously-frontmost app: whatever the user clicked on is already frontmost, and reactivating
+    /// it would fight that.
+    func windowDidResignKey(_ notification: Notification) {
+        guard panel.isVisible else { return }
+        hide(restorePreviousApp: false)
     }
 
     /// Forwards `Config.hotkeys` to the view model so "Assign Hotkey…" can show the current
@@ -118,6 +135,10 @@ final class PaletteWindowController {
     /// (see `PaletteItem.dismissesToPreviousApp`), so that app keeps the foreground instead of
     /// losing a race against this (effectively synchronous) reactivation.
     func hide(restorePreviousApp: Bool = true) {
+        guard !isHiding else { return }
+        isHiding = true
+        defer { isHiding = false }
+
         removeKeyEventMonitor()
         panel.orderOut(nil)
         if restorePreviousApp {

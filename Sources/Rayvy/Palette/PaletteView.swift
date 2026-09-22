@@ -338,29 +338,35 @@ struct PaletteView: View {
                     }
                 )
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(viewModel.sections, id: \.0) { section, items in
-                            Text(section.rawValue)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 14)
-                                .padding(.top, 8)
-                                .padding(.bottom, 2)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(viewModel.sections, id: \.0) { section, items in
+                                Text(section.rawValue)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 14)
+                                    .padding(.top, 8)
+                                    .padding(.bottom, 2)
 
-                            ForEach(items) { item in
-                                PaletteRow(item: item, isSelected: item.id == viewModel.selectedID)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        viewModel.selectedID = item.id
-                                        viewModel.activateSelected()
-                                    }
+                                ForEach(items) { item in
+                                    PaletteRow(item: item, isSelected: item.id == viewModel.selectedID)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            viewModel.selectedID = item.id
+                                            viewModel.activateSelected()
+                                        }
+                                }
                             }
                         }
+                        .padding(.bottom, 8)
                     }
-                    .padding(.bottom, 8)
+                    .frame(maxHeight: PaletteViewModel.maxListHeight)
+                    .onChange(of: viewModel.selectedID) { newValue in
+                        guard let newValue else { return }
+                        proxy.scrollTo(newValue, anchor: nil)
+                    }
                 }
-                .frame(maxHeight: PaletteViewModel.maxListHeight)
             }
         }
         .frame(width: 640)
