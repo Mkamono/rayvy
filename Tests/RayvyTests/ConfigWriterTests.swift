@@ -63,4 +63,29 @@ final class ConfigWriterTests: XCTestCase {
         let config = try TOMLDecoder().decode(Config.self, from: String(contentsOf: tempFileURL, encoding: .utf8))
         XCTAssertTrue(config.hotkeys.contains(HotkeyEntry(key: "option+g", bundleID: "com.example.app")))
     }
+
+    /// Dotfiles-managed configs often make `~/.config/rayvy/config.toml` a symlink into a
+    /// separate repo. An atomic write must update the symlink's target, not replace the symlink
+    /// itself with a plain file (which would sever it from the dotfiles repo).
+    func testWritingThroughASymlinkUpdatesTheTargetAndPreservesTheLink() throws {
+        let realFileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rayvy-config-writer-tests-real-\(UUID().uuidString).toml")
+        defer { try? FileManager.default.removeItem(at: realFileURL) }
+
+        let original = """
+        [launcher]
+        hotkey = "option+space"
+        """
+        try original.write(to: realFileURL, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(at: tempFileURL, withDestinationURL: realFileURL)
+
+        try ConfigWriter.setDirectHotkey(key: "option+t", bundleID: "com.mitchellh.ghostty", fileURL: tempFileURL)
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: tempFileURL.path)
+        XCTAssertEqual(attributes[.type] as? FileAttributeType, .typeSymbolicLink, "symlink itself should be untouched")
+
+        let config = try TOMLDecoder().decode(Config.self, from: String(contentsOf: realFileURL, encoding: .utf8))
+        XCTAssertEqual(config.launcher.hotkey, "option+space")
+        XCTAssertEqual(config.hotkeys, [HotkeyEntry(key: "option+t", bundleID: "com.mitchellh.ghostty")])
+    }
 }

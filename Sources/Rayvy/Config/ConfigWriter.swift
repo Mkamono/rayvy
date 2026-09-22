@@ -42,9 +42,23 @@ enum ConfigWriter {
         }
 
         do {
-            try table.convert().write(to: fileURL, atomically: true, encoding: .utf8)
+            try table.convert().write(to: resolveSymlinkTarget(fileURL), atomically: true, encoding: .utf8)
         } catch {
             throw WriteError.writeFailed
         }
+    }
+
+    /// An atomic write (write-temp-then-rename) replaces whatever's at `fileURL` without
+    /// following a symlink there — which would break a dotfiles setup where `config.toml` is a
+    /// symlink into a managed repo, replacing it with a plain file. Resolves through any symlink
+    /// chain first so the write lands on the real target and the symlink itself stays intact.
+    private static func resolveSymlinkTarget(_ fileURL: URL) -> URL {
+        var current = fileURL
+        var depth = 0
+        while depth < 10, let destination = try? FileManager.default.destinationOfSymbolicLink(atPath: current.path) {
+            current = URL(fileURLWithPath: destination, relativeTo: current.deletingLastPathComponent()).standardizedFileURL
+            depth += 1
+        }
+        return current
     }
 }
