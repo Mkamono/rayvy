@@ -19,7 +19,7 @@ swift test --filter ClipboardHistoryTests/testAddInsertsAtFront   # run one test
 ./scripts/build-app.sh          # assembles dist/Rayvy.app (release build + Info.plist + ad-hoc codesign)
 ```
 
-CI (`.github/workflows/ci.yml`) runs `swift build -v` and `swift test -v` on `macos-14` for pushes to `main` and PRs. Releases (`.github/workflows/release.yml`) trigger on `v*.*.*` tags, run `scripts/build-app.sh` with `VERSION` set from the tag, and publish a zipped `Rayvy.app` to GitHub Releases.
+CI (`.github/workflows/ci.yml`) runs `swift build -v` and `swift test -v` on `macos-latest` for pushes to `main` and PRs. Releases (`.github/workflows/release.yml`) trigger on `v*.*.*` tags, run `scripts/build-app.sh` with `VERSION` set from the tag, and publish a zipped `Rayvy.app` to GitHub Releases.
 
 There is no lint step configured.
 
