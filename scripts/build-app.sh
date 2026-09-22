@@ -23,6 +23,12 @@ cp "$BIN_PATH/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 cp "Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
+# Set by release.yml from the pushed tag; left as the Info.plist default for local builds.
+if [ -n "${VERSION:-}" ]; then
+	echo "==> Setting CFBundleShortVersionString to $VERSION"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_BUNDLE/Contents/Info.plist"
+fi
+
 if [ -f "Resources/AppIcon.icns" ]; then
 	cp "Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 fi
