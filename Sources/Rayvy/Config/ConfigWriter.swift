@@ -24,14 +24,13 @@ enum ConfigWriter {
             throw WriteError.parseFailed
         }
 
-        let hotkeysArray: TOMLArray
-        if let existing = table["hotkeys"]?.array {
-            hotkeysArray = existing
-        } else {
-            let newArray = TOMLArray()
-            table["hotkeys"] = newArray
-            hotkeysArray = newArray
+        // Assigning `table["hotkeys"] = TOMLArray()` inserts a *copy* into the table's tree, so a
+        // locally-held reference to that array would go stale before `.append` below ever runs.
+        // Insert the empty array first, then re-fetch the live one from the table.
+        if table["hotkeys"]?.array == nil {
+            table["hotkeys"] = TOMLArray()
         }
+        guard let hotkeysArray = table["hotkeys"]?.array else { throw WriteError.parseFailed }
 
         if let existingEntry = hotkeysArray.first(where: { $0.table?["bundle_id"]?.string == bundleID })?.table {
             existingEntry["key"] = key
