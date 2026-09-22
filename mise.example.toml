@@ -1,0 +1,6 @@
+[bootstrap.packages."macos-app:rayvy"]
+version = "0.1.0"
+url = "https://github.com/Mkamono/rayvy/releases/download/v{{version}}/Rayvy-{{version}}-arm64.zip"
+sha256 = "8055207b44e8e38b8b01e54c6a7d644882685ee7df036c38846d91827c045fb3"
+artifact = "Rayvy.app"
+os = "macos/arm64"

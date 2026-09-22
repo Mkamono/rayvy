@@ -41,3 +41,31 @@ jobs:
             "${{ steps.package.outputs.asset_name }}.sha256" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
+
+      - name: Update mise.example.toml on main
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          sha256=$(awk '{print $1}' "${{ steps.package.outputs.asset_name }}.sha256")
+
+          git fetch origin main
+          git checkout -B main origin/main
+
+          cat > mise.example.toml <<EOF
+          [bootstrap.packages."macos-app:rayvy"]
+          version = "$VERSION"
+          url = "https://github.com/$REPO/releases/download/v{{version}}/Rayvy-{{version}}-arm64.zip"
+          sha256 = "$sha256"
+          artifact = "Rayvy.app"
+          os = "macos/arm64"
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add mise.example.toml
+          if ! git diff --cached --quiet; then
+            git commit -m "Update mise.example.toml for $GITHUB_REF_NAME"
+            git push origin main
+          fi
