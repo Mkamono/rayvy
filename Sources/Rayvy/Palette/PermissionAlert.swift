@@ -17,6 +17,7 @@ enum PermissionAlert {
                 title: "Grant Accessibility Permission",
                 subtitle: "Required to paste Clipboard History selections \u{2014} opens System Settings",
                 icon: NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil),
+                dismissesToPreviousApp: false,
                 action: {
                     guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else { return }
                     NSWorkspace.shared.open(url)

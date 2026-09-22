@@ -15,6 +15,13 @@ enum PaletteSection: String, CaseIterable {
 struct PaletteAction: Identifiable {
     let id: String
     let title: String
+    /// Whether hiding the palette after this action should reactivate whatever app was frontmost
+    /// before the palette opened (the default, Spotlight-style behavior). Set `false` for an
+    /// action that hands focus to a specific other app or system pane (e.g. "Reveal in Finder") —
+    /// `previouslyActiveApp.activate()` is effectively synchronous, so it otherwise wins the race
+    /// against that app's own (often async, e.g. an Apple Event to an already-running process)
+    /// activation and steals focus right back.
+    var dismissesToPreviousApp: Bool = true
     let perform: () -> Void
 }
 
@@ -25,6 +32,8 @@ struct PaletteItem: Identifiable {
     let subtitle: String?
     let icon: NSImage?
     var actions: [PaletteAction] = []
+    /// See `PaletteAction.dismissesToPreviousApp` — same rationale, for the primary Enter action.
+    var dismissesToPreviousApp: Bool = true
     let action: () -> Void
 }
 

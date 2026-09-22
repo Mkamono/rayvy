@@ -54,8 +54,8 @@ final class PaletteWindowController {
         panel.contentView = NSHostingView(rootView: PaletteView(viewModel: viewModel))
         self.panel = panel
 
-        viewModel.onActivate = { [weak self] in
-            self?.hide()
+        viewModel.onActivate = { [weak self] dismissesToPreviousApp in
+            self?.hide(restorePreviousApp: dismissesToPreviousApp)
         }
 
         viewModel.$contentHeight
@@ -113,10 +113,16 @@ final class PaletteWindowController {
         installKeyEventMonitor()
     }
 
-    func hide() {
+    /// `restorePreviousApp: false` skips reactivating the app that was frontmost before the
+    /// palette opened — for an action that handed focus to a specific other app or system pane
+    /// (see `PaletteItem.dismissesToPreviousApp`), so that app keeps the foreground instead of
+    /// losing a race against this (effectively synchronous) reactivation.
+    func hide(restorePreviousApp: Bool = true) {
         removeKeyEventMonitor()
         panel.orderOut(nil)
-        previouslyActiveApp?.activate()
+        if restorePreviousApp {
+            previouslyActiveApp?.activate()
+        }
         previouslyActiveApp = nil
         InputSourceSwitcher.restore(to: previousInputSourceID)
         previousInputSourceID = nil

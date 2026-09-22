@@ -45,7 +45,9 @@ final class PaletteViewModel: ObservableObject {
     /// bundle ID -> configured Direct Hotkey spec, kept in sync with `Config.hotkeys` by
     /// `PaletteWindowController.updateConfig(_:)` so "Assign Hotkey…" can show the current binding.
     private var directHotkeys: [String: String] = [:]
-    var onActivate: (() -> Void)?
+    /// Called after an action fires to dismiss the palette; passes whether the previously
+    /// frontmost app should be reactivated (see `PaletteItem.dismissesToPreviousApp`).
+    var onActivate: ((Bool) -> Void)?
 
     init(appIndex: AppIndex, clipboardHistory: ClipboardHistory, onQuitRayvy: @escaping () -> Void) {
         self.appIndex = appIndex
@@ -87,7 +89,7 @@ final class PaletteViewModel: ObservableObject {
                     SystemActions.quit(running)
                 })
             }
-            actions.append(PaletteAction(id: "reveal", title: "Reveal in Finder") {
+            actions.append(PaletteAction(id: "reveal", title: "Reveal in Finder", dismissesToPreviousApp: false) {
                 NSWorkspace.shared.activateFileViewerSelecting([app.url])
             })
             actions.append(PaletteAction(id: "copyBundleID", title: "Copy Bundle ID") {
@@ -195,7 +197,7 @@ final class PaletteViewModel: ObservableObject {
     func activateSelected() {
         guard let item = selectedItem else { return }
         item.action()
-        onActivate?()
+        onActivate?(item.dismissesToPreviousApp)
     }
 
     /// Opens (or closes, if already open) the ⌘K action menu for the selected item. No-ops for
@@ -226,7 +228,7 @@ final class PaletteViewModel: ObservableObject {
         // "Assign Hotkey…" leaves the palette open in capture mode instead of dismissing it, so
         // skip the usual close-on-action behavior when it just opened the capture screen.
         if hotkeyCapture == nil {
-            onActivate?()
+            onActivate?(action.dismissesToPreviousApp)
         }
     }
 
