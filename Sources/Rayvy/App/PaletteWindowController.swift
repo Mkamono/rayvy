@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// A borderless `NSPanel` normally can't become the key window (Apple's default is `false` unless
@@ -12,10 +13,24 @@ private final class KeyablePanel: NSPanel {
 /// frontmost app on hide (Spotlight-style).
 @MainActor
 final class PaletteWindowController {
+    private static let panelWidth: CGFloat = 640
+    private static let textFieldAreaHeight: CGFloat = 56
+    private static let sectionHeaderHeight: CGFloat = 26
+    private static let rowHeight: CGFloat = 32
+    private static let dividerAndBottomPadding: CGFloat = 9
+    private static let maxListHeight: CGFloat = 400
+
     private let panel: NSPanel
     private let viewModel: PaletteViewModel
     private var previouslyActiveApp: NSRunningApplication?
     private var keyEventMonitor: Any?
+    private var cancellables = Set<AnyCancellable>()
+
+    // The panel's on-screen position is fixed once per `show()` and only its height changes as
+    // results come and go, so it grows/shrinks downward from a stable top edge instead of
+    // re-centering (which would make the search field jump around while typing).
+    private var anchorX: CGFloat?
+    private var anchorTopY: CGFloat?
 
     var isVisible: Bool { panel.isVisible }
 
@@ -28,7 +43,7 @@ final class PaletteWindowController {
         self.viewModel = viewModel
 
         let panel = KeyablePanel(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 80),
+            contentRect: NSRect(x: 0, y: 0, width: Self.panelWidth, height: Self.textFieldAreaHeight),
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -46,6 +61,12 @@ final class PaletteWindowController {
         viewModel.onActivate = { [weak self] in
             self?.hide()
         }
+
+        viewModel.$sections
+            .sink { [weak self] sections in
+                self?.resize(for: sections)
+            }
+            .store(in: &cancellables)
     }
 
     func toggle() {
@@ -58,16 +79,14 @@ final class PaletteWindowController {
 
     func show() {
         previouslyActiveApp = NSWorkspace.shared.frontmostApplication
-        viewModel.reset()
 
         if let screenFrame = NSScreen.main?.visibleFrame {
-            let size = panel.frame.size
-            let origin = NSPoint(
-                x: screenFrame.midX - size.width / 2,
-                y: screenFrame.midY - size.height / 2 + screenFrame.height * 0.15
-            )
-            panel.setFrameOrigin(origin)
+            anchorX = screenFrame.midX - Self.panelWidth / 2
+            anchorTopY = screenFrame.midY + screenFrame.height * 0.15 + Self.textFieldAreaHeight / 2
         }
+
+        // Triggers `viewModel.$sections`, which resizes the panel to fit before it's shown.
+        viewModel.reset()
 
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
@@ -79,6 +98,25 @@ final class PaletteWindowController {
         panel.orderOut(nil)
         previouslyActiveApp?.activate()
         previouslyActiveApp = nil
+    }
+
+    private func resize(for sections: [(PaletteSection, [PaletteItem])]) {
+        guard let anchorX, let anchorTopY else { return }
+
+        let rawListHeight = sections.reduce(CGFloat(0)) { partial, section in
+            partial + Self.sectionHeaderHeight + CGFloat(section.1.count) * Self.rowHeight
+        }
+        let listHeight = sections.isEmpty ? 0 : min(Self.maxListHeight, rawListHeight)
+        let extra: CGFloat = sections.isEmpty ? 0 : Self.dividerAndBottomPadding
+        let totalHeight = Self.textFieldAreaHeight + listHeight + extra
+
+        let newFrame = NSRect(
+            x: anchorX,
+            y: anchorTopY - totalHeight,
+            width: Self.panelWidth,
+            height: totalHeight
+        )
+        panel.setFrame(newFrame, display: panel.isVisible)
     }
 
     private func installKeyEventMonitor() {
