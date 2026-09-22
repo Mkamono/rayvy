@@ -1,54 +1,53 @@
 # Rayvy
 
-Lightweight macOS launcher. `⌥Space` → Command Palette → apps, clipboard history, system actions.
+macOS向けの軽量ランチャー。`⌥Space` → Command Palette → アプリ / Clipboard History / システム操作。
 
-## Overview
+## 概要
 
-Rayvy is a small, always-running (Dock/menu-bar-less) macOS app built around one flow:
+Rayvyは常駐型(Dock・メニューバーなし)の小さなmacOSアプリで、次の1本のフローだけを軸にしている。
 
 ```text
 Global Hotkey → Command Palette → Apps / Clipboard History / System Commands
 ```
 
-It deliberately stays small — no fuzzy search, no GUI settings screen, no plugins, no cloud sync.
-See [`SPEC.md`](SPEC.md) for the full design and the explicit out-of-scope list.
+意図的に小さく保っている — 高度なfuzzy searchも、GUI設定画面も、プラグインも、Cloud Syncもない。
+詳しい設計と明示的なスコープ外一覧は [`SPEC.md`](SPEC.md) を参照。
 
-## Installation
+## インストール
 
-Via [mise](https://mise.jdx.dev):
+[mise](https://mise.jdx.dev) 経由:
 
 ```bash
-cp mise.example.toml mise.toml   # or merge the [bootstrap.packages] entry into your own
+cp mise.example.toml mise.toml   # または [bootstrap.packages] の項目だけ自分のmise.tomlにマージ
 mise bootstrap
 ```
 
-Or download `Rayvy-<version>-arm64.zip` from [Releases](https://github.com/Mkamono/rayvy/releases), unzip, and
-move `Rayvy.app` to `/Applications`.
+または [Releases](https://github.com/Mkamono/rayvy/releases) から `Rayvy-<version>-arm64.zip` をダウンロードし、
+解凍して `Rayvy.app` を `/Applications` に移動する。
 
-Rayvy.app is ad-hoc signed (not notarized), so macOS Gatekeeper will refuse to open it on first launch — see
-[Troubleshooting](#troubleshooting).
+Rayvy.appはad-hoc署名(notarizeなし)のため、初回起動時にGatekeeperにブロックされる。
+[トラブルシューティング](#トラブルシューティング)を参照。
 
-## Usage
+## 使い方
 
-Press the launcher hotkey (`⌥Space` by default) to open the Command Palette. Type to search apps, System
-Commands, and Clipboard History together (plain substring match, not fuzzy). Use the arrow keys and Return to
-select, Escape to close.
+ランチャーのホットキー(デフォルト `⌥Space`)でCommand Paletteを開く。アプリ・System Commands・Clipboard
+Historyをまとめて検索できる(fuzzyではない単純な文字列一致)。矢印キーとReturnで選択、Escapeで閉じる。
 
-Selecting an item with secondary actions (apps, Clipboard History entries) shows a `⌘K` hint — press `⌘K` to
-open its action menu (Quit, Reveal in Finder, Copy Bundle ID, Assign Hotkey…, etc).
+⌘Kのヒントが出ている項目(アプリ、Clipboard Historyの各項目)は `⌘K` でアクションメニューを開ける(Quit、
+Reveal in Finder、Copy Bundle ID、Assign Hotkey…など)。
 
-While the palette is open, Rayvy switches the system input source to a Roman/alphabet layout so typing a query
-doesn't fight with an IME, and restores your previous input source when it closes.
+パレットが開いている間は、日本語IME等が検索の邪魔をしないよう自動的にRoman/アルファベット入力に切り替わり、
+閉じると元の入力ソースに戻る。
 
-## Configuration
+## 設定
 
-Settings live in a single TOML file, created with defaults on first run:
+設定は単一のTOMLファイルにまとまっており、初回起動時にデフォルト値で作成される。
 
 ```text
 ~/.config/rayvy/config.toml
 ```
 
-It's hot-reloaded on save — no restart needed. Example:
+保存すると再起動なしでHot Reloadされる。例:
 
 ```toml
 [launcher]
@@ -65,56 +64,53 @@ key = "option+t"
 bundle_id = "com.mitchellh.ghostty"
 ```
 
-Hotkey strings combine modifiers (`cmd`/`command`, `option`/`alt`, `shift`, `control`/`ctrl`) with a key,
-joined by `+` (e.g. `"cmd+shift+t"`). An invalid value clears whatever was previously bound rather than leaving
-the old shortcut active.
+Hotkeyの文字列は修飾キー(`cmd`/`command`、`option`/`alt`、`shift`、`control`/`ctrl`)とキーを `+` で
+つなげる(例: `"cmd+shift+t"`)。不正な値にすると、以前の割り当てをそのまま残さず解除する。
 
 ## Direct Hotkeys
 
-`[[hotkeys]]` entries bind a global shortcut straight to an app by bundle ID, without opening the palette
-first. Pressing it launches the app if it isn't running, activates it if it's running in the background, and
-hides it if it's already frontmost.
+`[[hotkeys]]` の各エントリは、パレットを開かずにbundle ID指定でアプリへ直接グローバルショートカットを割り当
+てる。押すと、未起動なら起動、バックグラウンドなら前面化、既にフォアグラウンドなら隠す、という動作になる。
 
-Two ways to set one:
+設定方法は2通り:
 
-- **In the app**: select the app in the Command Palette, press `⌘K`, choose "Assign Hotkey…" (or "Change
-  Hotkey…" if one's already set), then press the key combination. This is the one setting Rayvy will write to
-  `config.toml` on your behalf.
-- **By hand**: add a `[[hotkeys]]` entry to `config.toml` yourself. Use the app's `⌘K` → "Copy Bundle ID" action
-  to get its bundle ID.
+- **アプリ内から**: Command Paletteでアプリを選択し `⌘K` → 「Assign Hotkey…」(既に設定済みなら
+  「Change Hotkey…」)を選び、割り当てたいキーを押す。これはRayvyが`config.toml`に書き込む唯一の設定項目。
+- **手動で**: `config.toml` に `[[hotkeys]]` エントリを自分で追加する。bundle IDはアプリの `⌘K` →
+  「Copy Bundle ID」で取得できる。
 
 ## Clipboard History
 
-Rayvy watches the system pasteboard and keeps a deduplicated, in-memory history (persisted to
-`~/Library/Application Support/Rayvy/clipboard.json`), text only. Press its hotkey (`cmd+shift+v` by default) to
-jump straight into a clipboard-only view of the palette; selecting an entry recopies it and pastes it into
-whatever app was frontmost.
+Rayvyはシステムのペーストボードを監視し、重複排除済みの履歴をメモリ上に保持する(テキストのみ、
+`~/Library/Application Support/Rayvy/clipboard.json` に永続化)。専用ホットキー(デフォルト
+`cmd+shift+v`)でClipboard History専用のパレット表示に直接ジャンプでき、項目を選ぶと再コピーした上で
+直前までフォアグラウンドだったアプリへペーストする。
 
-Configurable via `[clipboard]`: `enabled`, `max_items`, `excluded_bundle_ids` (copies made while one of these
-apps is frontmost — e.g. a password manager — are ignored), and `hotkey`.
+`[clipboard]` で設定可能: `enabled`、`max_items`、`excluded_bundle_ids`(これらのアプリがフォアグラウンド
+の間のコピーは無視する — パスワードマネージャーなど)、`hotkey`。
 
-Pasting requires Accessibility permission (see [Troubleshooting](#troubleshooting)); without it, the item still
-lands on the pasteboard for a manual `⌘V`.
+ペーストにはAccessibility権限が必要([トラブルシューティング](#トラブルシューティング)参照)。権限が無く
+ても項目自体はペーストボードに残るので、手動での `⌘V` は可能。
 
 ## System Commands
 
-Available from the palette's "Commands" section: Sleep, Restart, Shut Down, Quit All Applications, Quit
-`<running app>` (per running app), Open Rayvy Settings (opens `config.toml`), Rayvy Docs (opens this README on
-GitHub), and Quit Rayvy.
+パレットの「Commands」セクションから: Sleep、Restart、Shut Down、Quit All Applications、
+Quit `<起動中のアプリ>`(起動中アプリごと)、Open Rayvy Settings(`config.toml`を開く)、
+Rayvy Docs(このREADMEをGitHubで開く)、Quit Rayvy。
 
-## Troubleshooting
+## トラブルシューティング
 
-**Gatekeeper blocks the first launch** ("Rayvy.app is damaged and can't be opened" or similar) — Rayvy.app is
-ad-hoc signed, not notarized. Right-click the app in Finder and choose Open, or clear the quarantine flag:
+**初回起動時にGatekeeperにブロックされる**(「"Rayvy.app"は壊れているため開けません」など) —
+Rayvy.appはad-hoc署名でnotarizeされていないため。Finderでアプリを右クリックして「開く」を選ぶか、
+quarantine属性を外す:
 
 ```bash
 xattr -d com.apple.quarantine /Applications/Rayvy.app
 ```
 
-**Granted Accessibility permission, but Clipboard History still won't paste** — the permission check only
-re-evaluates when Rayvy launches. Quit and reopen Rayvy after granting it in System Settings → Privacy &
-Security → Accessibility.
+**Accessibility権限を許可したのにClipboard Historyがペーストできない** — 権限チェックはRayvyの起動時にしか
+再評価されない。System Settings → プライバシーとセキュリティ → アクセシビリティで許可した後、Rayvyを
+再起動する。
 
-**A hotkey stopped working after editing `config.toml`** — check for a typo in the hotkey string; an
-unrecognized modifier or key silently clears that binding instead of keeping the old one active (see
-Configuration above).
+**`config.toml`を編集したらHotkeyが効かなくなった** — Hotkeyの文字列にtypoがないか確認する。認識できない
+修飾キーやキーを指定すると、以前の値を残さずその場でバインドが解除される(上記「設定」参照)。
