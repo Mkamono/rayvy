@@ -36,13 +36,14 @@ final class AppIndex {
         var results: [InstalledApp] = []
 
         for directory in Self.searchDirectories {
-            guard let entries = try? FileManager.default.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: nil,
-                options: [.skipsHiddenFiles]
-            ) else { continue }
+            // The URL-based `contentsOfDirectory(at:includingPropertiesForKeys:options:)` silently
+            // omits `/Applications/Safari.app` (a symlink into a cryptex-mounted system volume) on
+            // recent macOS, even though it's a perfectly normal entry to `ls` or the path-string
+            // API below. Enumerate by name instead and build URLs ourselves.
+            guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { continue }
 
-            for entryURL in entries where entryURL.pathExtension == "app" {
+            for name in names where name.hasSuffix(".app") {
+                let entryURL = directory.appendingPathComponent(name)
                 guard let app = Self.makeInstalledApp(at: entryURL) else { continue }
                 guard seen.insert(app.id).inserted else { continue }
                 results.append(app)
