@@ -9,3 +9,7 @@ os = "macos/arm64"
 [bootstrap.macos.launchd.agents.rayvy]
 program = "/Applications/Rayvy.app/Contents/MacOS/Rayvy"
 run_at_load = true
+
+# Optional: let `mise dot` back up and sync config.toml as a dotfile.
+[dotfiles]
+"~/.config/rayvy/config.toml" = { mode = "track" }

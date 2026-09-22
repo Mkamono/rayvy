@@ -33,6 +33,9 @@ Rayvy.appはad-hoc署名(notarizeなし)のため、初回起動時にGatekeeper
 Rayvy自身にはログイン時自動起動の仕組みは無い。必要なら `mise.example.toml` の
 `[bootstrap.macos.launchd.agents.rayvy]` を有効にすると、mise側でLaunchAgentとして登録できる。
 
+同様に `[dotfiles]` の `"~/.config/rayvy/config.toml" = { mode = "track" }` を有効にすると、
+`config.toml` の変更履歴を `mise dot` (`mise dot save`/`mise dot history`など) で追跡できる。
+
 ## 使い方
 
 ランチャーのホットキー(デフォルト `⌥Space`)でCommand Paletteを開く。アプリ・System Commands・Clipboard
