@@ -47,6 +47,17 @@ enum SystemCommand {
                 action: { NSWorkspace.shared.open(ConfigLoader.configFileURL) }
             ),
             PaletteItem(
+                id: "system.openDocs",
+                section: .commands,
+                title: "Rayvy Docs",
+                subtitle: "Opens the README on GitHub in your default browser",
+                icon: NSImage(systemSymbolName: "book", accessibilityDescription: nil),
+                action: {
+                    guard let url = URL(string: "https://github.com/Mkamono/rayvy#readme") else { return }
+                    NSWorkspace.shared.open(url)
+                }
+            ),
+            PaletteItem(
                 id: "system.quitRayvy",
                 section: .commands,
                 title: "Quit Rayvy",

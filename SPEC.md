@@ -196,6 +196,43 @@ mise側で、
 
 Rayvy自身には独自Updaterを持たせない。
 
+## Rayvy Docs
+
+ユーザー向けドキュメントは `README.md` に集約する。複数のDocsページや独自のヘルプUIは持たない。
+`SPEC.md` は開発者・Agent向けの内部仕様として残し、ユーザー向けドキュメントとは分離する。
+
+Command Paletteに `Rayvy Docs` コマンドを用意し、選択するとGitHub上のREADMEをブラウザで開く。
+初期実装では `main` ブランチのREADMEを参照する。
+
+```text
+https://github.com/Mkamono/rayvy#readme
+```
+
+Rayvy自身ではブラウザを選択せず、`NSWorkspace.shared.open` でURLを開いてmacOSのデフォルトブラウザに任せる。
+
+```text
+Command Palette
+      ↓
+Rayvy Docs
+      ↓
+NSWorkspace.open(URL)
+      ↓
+macOS default browser
+      ↓
+GitHub README
+```
+
+やらないこと:
+
+* 独自Docs画面・内蔵Markdown Viewer
+* 複数のDocs Command
+* ブラウザ指定
+* Docsサイト・Docs用の独自ナビゲーション
+* README以外とのドキュメント同期
+
+インストール済みRayvyとドキュメントの内容差異が問題になった場合のみ、現在のアプリバージョンに対応した
+tagのREADME(例: `/blob/v0.3.1/README.md`)を開くよう変更する。初期段階では不要。
+
 ## 実装構成
 
 Swiftのみで実装する。
